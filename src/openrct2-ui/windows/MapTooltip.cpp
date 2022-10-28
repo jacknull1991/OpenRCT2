@@ -18,29 +18,56 @@
 #include <openrct2/localisation/Localisation.h>
 
 // clang-format off
+
+static constexpr const int32_t WW = 200;
+static constexpr const int32_t WH = 44;
+
 static rct_widget window_map_tooltip_widgets[] = {
     MakeWidget({0, 0}, {200, 30}, WindowWidgetType::ImgBtn, WindowColour::Primary),
     WIDGETS_END,
 };
 
-static void WindowMapTooltipUpdate(rct_window *w);
-static void WindowMapTooltipPaint(rct_window *w, rct_drawpixelinfo *dpi);
-
-static WindowEventList window_map_tooltip_events([](auto& events)
-{
-    events.update = &WindowMapTooltipUpdate;
-    events.paint = &WindowMapTooltipPaint;
-});
 // clang-format on
 
 #define MAP_TOOLTIP_ARGS
-
+//
 static ScreenCoordsXY _lastCursor;
 static int32_t _cursorHoldDuration;
-
-static void WindowMapTooltipOpen();
-
+//
 static Formatter _mapTooltipArgs;
+
+class MapTooltipWindow final : public Window
+{
+private:
+    /*static ScreenCoordsXY _lastCursor;
+    static int32_t _cursorHoldDuration;
+
+    static Formatter _mapTooltipArgs;*/
+
+public:
+    void OnOpen() override
+    {
+        widgets = window_map_tooltip_widgets;
+    }
+
+    void OnUpdate() override
+    {
+        Invalidate();
+    }
+
+    void OnDraw(rct_drawpixelinfo& dpi) override
+    {
+        StringId stringId;
+        std::memcpy(&stringId, _mapTooltipArgs.Data(), sizeof(StringId));
+        if (stringId == STR_NONE)
+        {
+            return;
+        }
+
+        ScreenCoordsXY stringCoords(windowPos + ScreenCoordsXY{ width / 2, height / 2 });
+        DrawTextWrapped(&dpi, stringCoords, width, STR_MAP_TOOLTIP_STRINGID, _mapTooltipArgs, { TextAlignment::CENTRE });
+    }
+};
 
 void SetMapTooltip(Formatter& ft)
 {
@@ -52,10 +79,6 @@ const Formatter& GetMapTooltip()
     return _mapTooltipArgs;
 }
 
-/**
- *
- *  rct2: 0x006EE77A
- */
 void WindowMapTooltipUpdateVisibility()
 {
     if (ThemeGetFlags() & UITHEME_FLAG_USE_FULL_BOTTOM_TOOLBAR)
@@ -73,8 +96,9 @@ void WindowMapTooltipUpdateVisibility()
     _cursorHoldDuration++;
     if (abs(cursorChange.x) > 5 || abs(cursorChange.y) > 5 || (input_test_flag(INPUT_FLAG_5))
         || input_get_state() == InputState::ViewportRight)
+    {
         _cursorHoldDuration = 0;
-
+    }
     _lastCursor = cursor;
 
     // Show or hide tooltip
@@ -90,62 +114,15 @@ void WindowMapTooltipUpdateVisibility()
     }
     else
     {
-        WindowMapTooltipOpen();
+        ScreenCoordsXY pos = { cursor.x - (WW / 2), cursor.y + 15 };
+
+        auto window = WindowFocusOrCreate<MapTooltipWindow>(
+            WindowClass::MapTooltip, pos, WW, WH, WF_STICK_TO_FRONT | WF_TRANSPARENT | WF_NO_BACKGROUND);
+
+        window->Invalidate();
+        window->windowPos = pos;
+        window->width = WW;
+        window->height = WH;
     }
 }
 
-/**
- *
- *  rct2: 0x006A7C43
- */
-static void WindowMapTooltipOpen()
-{
-    rct_window* w;
-
-    constexpr int32_t width = 200;
-    constexpr int32_t height = 44;
-    const CursorState* state = context_get_cursor_state();
-    ScreenCoordsXY pos = { state->position.x - (width / 2), state->position.y + 15 };
-
-    w = window_find_by_class(WindowClass::MapTooltip);
-    if (w == nullptr)
-    {
-        w = WindowCreate(
-            pos, width, height, &window_map_tooltip_events, WindowClass::MapTooltip,
-            WF_STICK_TO_FRONT | WF_TRANSPARENT | WF_NO_BACKGROUND);
-        w->widgets = window_map_tooltip_widgets;
-    }
-    else
-    {
-        w->Invalidate();
-        w->windowPos = pos;
-        w->width = width;
-        w->height = height;
-    }
-}
-
-/**
- *
- *  rct2: 0x006EE8CE
- */
-static void WindowMapTooltipUpdate(rct_window* w)
-{
-    w->Invalidate();
-}
-
-/**
- *
- *  rct2: 0x006EE894
- */
-static void WindowMapTooltipPaint(rct_window* w, rct_drawpixelinfo* dpi)
-{
-    StringId stringId;
-    std::memcpy(&stringId, _mapTooltipArgs.Data(), sizeof(StringId));
-    if (stringId == STR_NONE)
-    {
-        return;
-    }
-
-    ScreenCoordsXY stringCoords(w->windowPos.x + (w->width / 2), w->windowPos.y + (w->height / 2));
-    DrawTextWrapped(dpi, stringCoords, w->width, STR_MAP_TOOLTIP_STRINGID, _mapTooltipArgs, { TextAlignment::CENTRE });
-}
