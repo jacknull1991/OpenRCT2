@@ -38,12 +38,6 @@ static Formatter _mapTooltipArgs;
 
 class MapTooltipWindow final : public Window
 {
-private:
-    /*static ScreenCoordsXY _lastCursor;
-    static int32_t _cursorHoldDuration;
-
-    static Formatter _mapTooltipArgs;*/
-
 public:
     void OnOpen() override
     {
